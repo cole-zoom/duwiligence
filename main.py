@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import os
 import requests
 import json
+import time
 
 LLM_API_URL = "https://api.openai.com/v1/chat/completions"
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
@@ -26,6 +27,7 @@ def extract():
         for idx, email in enumerate(emails, start=1):
             list_of_stories = call_llm(ticker, str(email['body']))
             print(list_of_stories)
+            time.sleep(3)
 
 
 
@@ -76,7 +78,6 @@ Here is the newsletter content:
         "temperature": 0
     })
     result = response.json()
-    print(result)
     try:
         text = result['choices'][0]['message']['content']
         

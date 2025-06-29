@@ -1,13 +1,11 @@
 from flask import Flask, request, jsonify
 import os
-from dotenv import load_dotenv
 import requests
 import json
 
-# Load environment variables (optional)
-load_dotenv()
 LLM_API_URL = "https://api.openai.com/v1/chat/completions"
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
+print(LLM_API_KEY)
 HEADERS = {
     "Authorization": f"Bearer {LLM_API_KEY}",
     "Content-Type": "application/json"
@@ -26,7 +24,7 @@ def extract():
     for stock in portfolios:
         ticker = stock['symbol']
         for idx, email in enumerate(emails, start=1):
-            list_of_stories = call_llm(ticker, email['body'])
+            list_of_stories = call_llm(ticker, str(email['body']))
             print(list_of_stories)
 
 
@@ -72,6 +70,7 @@ Here is the newsletter content:
         "temperature": 0
     })
     result = response.json()
+    print(result)
     try:
         text = result['choices'][0]['message']['content']
         
@@ -79,9 +78,9 @@ Here is the newsletter content:
         if cleaned_text.startswith('{') and cleaned_text.endswith('}'):
             return json.loads(cleaned_text)
             
-        return {"is_startup_announcement": False, "confidence": 0, "explanation": f"LLM failed: {e}"}
+        return {"title": False, "body": 0, "explanation": f"LLM failed: {e}", "confidence": 100 }
     except Exception as e:
-        return {"is_startup_announcement": False, "confidence": 0, "explanation": f"LLM failed: {e}"}
+        return {"title": False, "body": 0, "explanation": f"LLM failed: {e}", "confidence": 100 }
 
 
 def fetch_portfolios():

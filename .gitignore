@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Flask environment
+.env
+.env.*
+.env.local
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+
+# Bytecode and logs
+*.log
+*.pot
+*.pyc
+*.pyo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Flask instance folder (for runtime files)
+instance/
+
+# Testing
+htmlcov/
+.tox/
+.coverage
+coverage.xml
+.pytest_cache/
+nosetests.xml
+
+# MyPy
+.mypy_cache/
+.dmypy.json

@@ -3,6 +3,7 @@ import os
 import requests
 import json
 import time
+import asyncio
 
 LLM_API_URL = "https://api.openai.com/v1/chat/completions"
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
@@ -15,7 +16,7 @@ HEADERS = {
 app = Flask(__name__)
 
 @app.route("/extract", methods=["POST"])
-def extract():
+async def extract():
     data = request.get_json(force=True)
     emails = data.get("emails", [])
     portfolios = fetch_portfolios()
@@ -27,7 +28,7 @@ def extract():
         for idx, email in enumerate(emails, start=1):
             list_of_stories = call_llm(ticker, str(email['body']))
             print(list_of_stories)
-            time.sleep(3)
+            await asyncio.sleep(3)
 
 
 

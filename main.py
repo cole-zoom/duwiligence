@@ -52,6 +52,12 @@ If a story is related, you must include it in a JSON list in the following forma
   ...
 ]
 ```
+
+If there is no related stories, YOU MUST GIVE BACK AN EMPTY LIST
+```json
+[]
+```
+
 Only include stories that have a meaningful or plausible connection to the stock tickers. Ignore all others. Be conservative and avoid hallucinating connections.
 
 Here is the stock symbol to check against:

@@ -81,7 +81,7 @@ Here is the newsletter content:
         text = result['choices'][0]['message']['content']
         
         cleaned_text = text.replace('```json', '').replace('```', '').strip()
-        if cleaned_text.startswith('{') and cleaned_text.endswith('}'):
+        if cleaned_text.startswith('[') and cleaned_text.endswith(']'):
             return json.loads(cleaned_text)
             
         return {"title": False, "body": 0, "explanation": f"LLM failed: {e}", "confidence": 100 }

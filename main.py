@@ -22,19 +22,28 @@ async def extract():
     portfolios = fetch_portfolios()
 
     print(f"[INFO] Received {len(emails)} emails")
+    stockxstories = []
 
     for stock in portfolios:
         ticker = stock['symbol']
+        stories = []
         for idx, email in enumerate(emails, start=1):
             list_of_stories = call_llm(ticker, str(email['body']))
-            print(list_of_stories)
+            stories += list_of_stories
             await asyncio.sleep(3)
+
+        stockxstories.append({
+                'ticker': ticker,
+                'stories': list_of_stories
+            })
+        
+    non_empty_stories = [item for item in stockxstories if item.get("stories")]
 
 
 
     return jsonify({
         "status": "success",
-        "processed": len(emails)
+        "processed": non_empty_stories
     }), 200
 
 def call_llm(ticker, email):

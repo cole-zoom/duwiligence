@@ -2,5 +2,4 @@ Flask[async]
 python-dotenv
 requests
 hypercorn
-resend
 reportlab

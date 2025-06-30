@@ -3,8 +3,8 @@ import base64
 import json
 import os
 import requests
-import resend
-import time
+import smtplib
+from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from utils.generatepdf import generate_pdf
 
@@ -14,8 +14,8 @@ HEADERS = {
     "Authorization": f"Bearer {LLM_API_KEY}",
     "Content-Type": "application/json"
 }
-
-resend.api_key = os.environ.get("RESEND_API_KEY")
+GMAIL_USER = os.environ.get("GMAIL_USER")
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 
 app = Flask(__name__)
 
@@ -106,25 +106,19 @@ Here is the newsletter content:
     except Exception as e:
         return {"title": False, "body": 0, "explanation": f"LLM failed: {e}", "confidence": 100 }
     
-def send_email_with_resend(pdf_path: str, to_email: str):
-    with open(pdf_path, "rb") as f:
-        pdf_data = base64.b64encode(f.read()).decode()
+def send_email_gmail(pdf_path, to_email):
+    msg = EmailMessage()
+    msg['Subject'] = "Your Daily Newsletter"
+    msg['From'] = GMAIL_USER
+    msg['To'] = to_email
+    msg.set_content("Attached is your newsletter PDF.")
 
-    response = resend.Emails.send({
-        "from": "duwdillagence@gmail.com", 
-        "to": [to_email],
-        "subject": "Your Daily Newsletter PDF",
-        "html": "<p>Attached is your daily newsletter PDF.</p>",
-        "attachments": [
-            {
-                "filename": "newsletter.pdf",
-                "content": pdf_data,
-                "contentType": "application/pdf"
-            }
-        ]
-    })
+    with open(pdf_path, 'rb') as f:
+        msg.add_attachment(f.read(), maintype='application', subtype='pdf', filename='newsletter.pdf')
 
-    print("Email response:", response)
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        smtp.send_message(msg)
 
 
 def fetch_portfolios():

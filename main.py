@@ -154,6 +154,50 @@ def fetch_portfolios():
         {
             'symbol': 'CDNS',
             'portfolio': 'Cash'
+        },
+        {
+            'symbol': 'AISP',
+            'portfolio': 'Cash'
+        },
+        {
+            'symbol': 'USE',
+            'portfolio': 'Cash'
+        },
+        {
+            'symbol': 'LGN',
+            'portfolio': 'Cash'
+        },
+        {
+            'symbol': 'BFM',
+            'portfolio': 'Cash'
+        },
+        {
+            'symbol': 'VUS',
+            'portfolio': 'Cash'
+        },
+        {
+            'symbol': 'TD',
+            'portfolio': 'Cash'
+        },
+        {
+            'symbol': 'AMZN',
+            'portfolio': 'Cash'
+        },
+        {
+            'symbol': 'SCHD',
+            'portfolio': 'Cash'
+        },
+        {
+            'symbol': 'TSLA',
+            'portfolio': 'Cash'
+        },
+        {
+            'symbol': 'GOOG',
+            'portfolio': 'Cash'
+        },
+        {
+            'symbol': 'BTC',
+            'portfolio': 'Cash'
         }
     
     ]

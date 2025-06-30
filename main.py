@@ -111,7 +111,7 @@ def send_email_with_resend(pdf_path: str, to_email: str):
         pdf_data = base64.b64encode(f.read()).decode()
 
     response = resend.Emails.send({
-        "from": "your@email.com",  # Must be a verified sender domain in Resend
+        "from": "duwdillagence@gmail.com", 
         "to": [to_email],
         "subject": "Your Daily Newsletter PDF",
         "html": "<p>Attached is your daily newsletter PDF.</p>",

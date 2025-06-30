@@ -87,24 +87,29 @@ Here is the newsletter content:
 {email}
 
     """
-    response = requests.post(LLM_API_URL, headers=HEADERS, json={
-        "model": "gpt-4o",
-        "messages": [
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0
-    })
-    result = response.json()
-    try:
-        text = result['choices'][0]['message']['content']
+    max_retries = 10
+    for i in range(max_retries):
+        try:
+            response = requests.post(LLM_API_URL, headers=HEADERS, json={
+                "model": "gpt-4o",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0
+            })
+            print(response)
+            result = response.json()
         
-        cleaned_text = text.replace('```json', '').replace('```', '').strip()
-        if cleaned_text.startswith('[') and cleaned_text.endswith(']'):
-            return json.loads(cleaned_text)
+            text = result['choices'][0]['message']['content']
             
-        return {"title": False, "body": 0, "explanation": f"LLM failed: {e}", "confidence": 100 }
-    except Exception as e:
-        return {"title": False, "body": 0, "explanation": f"LLM failed: {e}", "confidence": 100 }
+            cleaned_text = text.replace('```json', '').replace('```', '').strip()
+            if cleaned_text.startswith('[') and cleaned_text.endswith(']'):
+                return json.loads(cleaned_text)
+                
+            asyncio.sleep(i*2)
+        except Exception as e:
+            asyncio.sleep(i*2)
+    return []
     
 def send_email_gmail(pdf_path, to_email):
     msg = EmailMessage()

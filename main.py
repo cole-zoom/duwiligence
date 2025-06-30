@@ -45,7 +45,7 @@ async def extract():
 
     tmp_path = "/tmp/newsletter.pdf"
     generate_pdf(non_empty_stories, tmp_path)
-    send_email_with_resend(tmp_path, "coledumanski@gmail.com")
+    send_email_gmail(tmp_path, "coledumanski@gmail.com")
 
 
     return jsonify({

@@ -1,17 +1,21 @@
-from flask import Flask, request, jsonify
+import asyncio
+import base64
+import json
 import os
 import requests
-import json
+import resend
 import time
-import asyncio
+from flask import Flask, request, jsonify
+from utils.generatepdf import generate_pdf
 
 LLM_API_URL = "https://api.openai.com/v1/chat/completions"
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
-print(LLM_API_KEY)
 HEADERS = {
     "Authorization": f"Bearer {LLM_API_KEY}",
     "Content-Type": "application/json"
 }
+
+resend.api_key = os.environ.get("RESEND_API_KEY")
 
 app = Flask(__name__)
 
@@ -39,6 +43,9 @@ async def extract():
         
     non_empty_stories = [item for item in stockxstories if item.get("stories")]
 
+    tmp_path = "/tmp/newsletter.pdf"
+    generate_pdf(non_empty_stories, tmp_path)
+    send_email_with_resend(tmp_path, "coledumanski@gmail.com")
 
 
     return jsonify({
@@ -98,6 +105,26 @@ Here is the newsletter content:
         return {"title": False, "body": 0, "explanation": f"LLM failed: {e}", "confidence": 100 }
     except Exception as e:
         return {"title": False, "body": 0, "explanation": f"LLM failed: {e}", "confidence": 100 }
+    
+def send_email_with_resend(pdf_path: str, to_email: str):
+    with open(pdf_path, "rb") as f:
+        pdf_data = base64.b64encode(f.read()).decode()
+
+    response = resend.Emails.send({
+        "from": "your@email.com",  # Must be a verified sender domain in Resend
+        "to": [to_email],
+        "subject": "Your Daily Newsletter PDF",
+        "html": "<p>Attached is your daily newsletter PDF.</p>",
+        "attachments": [
+            {
+                "filename": "newsletter.pdf",
+                "content": pdf_data,
+                "contentType": "application/pdf"
+            }
+        ]
+    })
+
+    print("Email response:", response)
 
 
 def fetch_portfolios():

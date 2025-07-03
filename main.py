@@ -8,6 +8,7 @@ from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from utils.generatepdf import generate_pdf
 import httpx
+import threading
 
 LLM_API_URL = "https://api.openai.com/v1/chat/completions"
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
@@ -20,24 +21,12 @@ GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 
 app = Flask(__name__)
 
-@app.route("/extract", methods=["POST"])
-async def extract():
-    print("[LOG] /extract endpoint called")
-    try:
-        data = request.get_json(force=True)
-        print(f"[LOG] Received request data: {json.dumps(data)[:500]}")
-    except Exception as e:
-        print(f"[ERROR] Failed to parse JSON from request: {e}")
-        return jsonify({"status": "error", "message": "Invalid JSON"}), 400
-
-    emails = data.get("emails", [])
-    print(f"[LOG] Number of emails received: {len(emails)}")
+def process_emails_and_send_newsletter(emails):
+    print("[LOG] Background processing started")
     portfolios = fetch_portfolios()
     print(f"[LOG] Number of portfolios fetched: {len(portfolios)}")
-
     stockxstories = []
     BATCH_SIZE = 5
-
     for stock in portfolios:
         ticker = stock['symbol']
         print(f"[LOG] Processing ticker: {ticker}")
@@ -45,24 +34,21 @@ async def extract():
         for i in range(0, len(emails), BATCH_SIZE):
             batch = emails[i:i+BATCH_SIZE]
             print(f"[LOG] Processing batch {i//BATCH_SIZE+1} for ticker {ticker}")
-            
             tasks = [call_llm(ticker, str(email['body'])) for email in batch]
-            results = await asyncio.gather(*tasks)
+            results = asyncio.run(asyncio.gather(*tasks))
             for idx, list_of_stories in enumerate(results):
                 print(f"[LOG] LLM returned {len(list_of_stories)} stories for ticker {ticker} on email {i+idx+1}")
                 stories += list_of_stories
             if i + BATCH_SIZE < len(emails):
                 print(f"[LOG] Waiting 3 seconds before next batch for ticker {ticker}")
-                await asyncio.sleep(3)
+                asyncio.run(asyncio.sleep(3))
         stockxstories.append({
                 'ticker': ticker,
                 'stories': stories
             })
         print(f"[LOG] Finished processing ticker {ticker}, total stories: {len(stories)}")
-    
     non_empty_stories = [item for item in stockxstories if item.get("stories")]
     print(f"[LOG] Number of non-empty stock stories: {len(non_empty_stories)}")
-
     tmp_path = "/tmp/newsletter.pdf"
     try:
         print(f"[LOG] Generating PDF at {tmp_path}")
@@ -70,21 +56,31 @@ async def extract():
         print(f"[LOG] PDF generated successfully")
     except Exception as e:
         print(f"[ERROR] Failed to generate PDF: {e}")
-        return jsonify({"status": "error", "message": "PDF generation failed"}), 500
-
+        return
     try:
         print(f"[LOG] Sending email with PDF attachment to coledumanski@gmail.com")
         send_email_gmail(tmp_path, "coledumanski@gmail.com")
         print(f"[LOG] Email sent successfully")
     except Exception as e:
         print(f"[ERROR] Failed to send email: {e}")
-        return jsonify({"status": "error", "message": "Email sending failed"}), 500
+        return
+    print(f"[LOG] Background processing completed successfully")
 
-    print(f"[LOG] /extract endpoint completed successfully")
-    return jsonify({
-        "status": "success",
-        "processed": non_empty_stories
-    }), 200
+@app.route("/extract", methods=["POST"])
+def extract():
+    print("[LOG] /extract endpoint called")
+    try:
+        data = request.get_json(force=True)
+        print(f"[LOG] Received request data: {json.dumps(data)[:500]}")
+    except Exception as e:
+        print(f"[ERROR] Failed to parse JSON from request: {e}")
+        return jsonify({"status": "error", "message": "Invalid JSON"}), 400
+    emails = data.get("emails", [])
+    print(f"[LOG] Number of emails received: {len(emails)}")
+    # For production, switch this to enqueue a Cloud Task instead of threading.Thread
+    threading.Thread(target=process_emails_and_send_newsletter, args=(emails,)).start()
+    print("[LOG] Background thread started, returning 200 to client")
+    return jsonify({"status": "processing"}), 200
 
 async def call_llm(ticker, email):
     prompt = f"""

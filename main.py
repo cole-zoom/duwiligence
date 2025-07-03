@@ -21,18 +21,33 @@ app = Flask(__name__)
 
 @app.route("/extract", methods=["POST"])
 async def extract():
-    data = request.get_json(force=True)
-    emails = data.get("emails", [])
-    portfolios = fetch_portfolios()
+    print("[LOG] /extract endpoint called")
+    try:
+        data = request.get_json(force=True)
+        print(f"[LOG] Received request data: {json.dumps(data)[:500]}")
+    except Exception as e:
+        print(f"[ERROR] Failed to parse JSON from request: {e}")
+        return jsonify({"status": "error", "message": "Invalid JSON"}), 400
 
-    print(f"[INFO] Received {len(emails)} emails")
+    emails = data.get("emails", [])
+    print(f"[LOG] Number of emails received: {len(emails)}")
+    portfolios = fetch_portfolios()
+    print(f"[LOG] Number of portfolios fetched: {len(portfolios)}")
+
     stockxstories = []
 
     for stock in portfolios:
         ticker = stock['symbol']
+        print(f"[LOG] Processing ticker: {ticker}")
         stories = []
         for idx, email in enumerate(emails, start=1):
-            list_of_stories = call_llm(ticker, str(email['body']))
+            print(f"[LOG] Calling LLM for ticker {ticker} on email {idx}/{len(emails)}")
+            try:
+                list_of_stories = call_llm(ticker, str(email['body']))
+                print(f"[LOG] LLM returned {len(list_of_stories)} stories for ticker {ticker} on email {idx}")
+            except Exception as e:
+                print(f"[ERROR] LLM call failed for ticker {ticker} on email {idx}: {e}")
+                list_of_stories = []
             stories += list_of_stories
             await asyncio.sleep(3)
 
@@ -40,14 +55,29 @@ async def extract():
                 'ticker': ticker,
                 'stories': list_of_stories
             })
-        
+        print(f"[LOG] Finished processing ticker {ticker}, total stories: {len(stories)}")
+    
     non_empty_stories = [item for item in stockxstories if item.get("stories")]
+    print(f"[LOG] Number of non-empty stock stories: {len(non_empty_stories)}")
 
     tmp_path = "/tmp/newsletter.pdf"
-    generate_pdf(non_empty_stories, tmp_path)
-    send_email_gmail(tmp_path, "coledumanski@gmail.com")
+    try:
+        print(f"[LOG] Generating PDF at {tmp_path}")
+        generate_pdf(non_empty_stories, tmp_path)
+        print(f"[LOG] PDF generated successfully")
+    except Exception as e:
+        print(f"[ERROR] Failed to generate PDF: {e}")
+        return jsonify({"status": "error", "message": "PDF generation failed"}), 500
 
+    try:
+        print(f"[LOG] Sending email with PDF attachment to coledumanski@gmail.com")
+        send_email_gmail(tmp_path, "coledumanski@gmail.com")
+        print(f"[LOG] Email sent successfully")
+    except Exception as e:
+        print(f"[ERROR] Failed to send email: {e}")
+        return jsonify({"status": "error", "message": "Email sending failed"}), 500
 
+    print(f"[LOG] /extract endpoint completed successfully")
     return jsonify({
         "status": "success",
         "processed": non_empty_stories

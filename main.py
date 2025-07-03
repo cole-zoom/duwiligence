@@ -7,6 +7,7 @@ import smtplib
 from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from utils.generatepdf import generate_pdf
+import httpx
 
 LLM_API_URL = "https://api.openai.com/v1/chat/completions"
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
@@ -35,25 +36,27 @@ async def extract():
     print(f"[LOG] Number of portfolios fetched: {len(portfolios)}")
 
     stockxstories = []
+    BATCH_SIZE = 5
 
     for stock in portfolios:
         ticker = stock['symbol']
         print(f"[LOG] Processing ticker: {ticker}")
         stories = []
-        for idx, email in enumerate(emails, start=1):
-            print(f"[LOG] Calling LLM for ticker {ticker} on email {idx}/{len(emails)}")
-            try:
-                list_of_stories = call_llm(ticker, str(email['body']))
-                print(f"[LOG] LLM returned {len(list_of_stories)} stories for ticker {ticker} on email {idx}")
-            except Exception as e:
-                print(f"[ERROR] LLM call failed for ticker {ticker} on email {idx}: {e}")
-                list_of_stories = []
-            stories += list_of_stories
-            await asyncio.sleep(3)
-
+        for i in range(0, len(emails), BATCH_SIZE):
+            batch = emails[i:i+BATCH_SIZE]
+            print(f"[LOG] Processing batch {i//BATCH_SIZE+1} for ticker {ticker}")
+            
+            tasks = [call_llm(ticker, str(email['body'])) for email in batch]
+            results = await asyncio.gather(*tasks)
+            for idx, list_of_stories in enumerate(results):
+                print(f"[LOG] LLM returned {len(list_of_stories)} stories for ticker {ticker} on email {i+idx+1}")
+                stories += list_of_stories
+            if i + BATCH_SIZE < len(emails):
+                print(f"[LOG] Waiting 3 seconds before next batch for ticker {ticker}")
+                await asyncio.sleep(3)
         stockxstories.append({
                 'ticker': ticker,
-                'stories': list_of_stories
+                'stories': stories
             })
         print(f"[LOG] Finished processing ticker {ticker}, total stories: {len(stories)}")
     
@@ -83,7 +86,7 @@ async def extract():
         "processed": non_empty_stories
     }), 200
 
-def call_llm(ticker, email):
+async def call_llm(ticker, email):
     prompt = f"""
 You are a financial assistant. Your job is to carefully review the following newsletter content, which contains one or more startup or tech-related stories.
 
@@ -120,25 +123,23 @@ Here is the newsletter content:
     max_retries = 10
     for i in range(max_retries):
         try:
-            response = requests.post(LLM_API_URL, headers=HEADERS, json={
-                "model": "gpt-4o",
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0
-            })
+            async with httpx.AsyncClient() as client:
+                response = await client.post(LLM_API_URL, headers=HEADERS, json={
+                    "model": "gpt-4o",
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0
+                })
             print(response)
             result = response.json()
-        
             text = result['choices'][0]['message']['content']
-            
             cleaned_text = text.replace('```json', '').replace('```', '').strip()
             if cleaned_text.startswith('[') and cleaned_text.endswith(']'):
                 return json.loads(cleaned_text)
-                
-            asyncio.sleep(i*2)
+            await asyncio.sleep(i*2)
         except Exception as e:
-            asyncio.sleep(i*2)
+            await asyncio.sleep(i*2)
     return []
     
 def send_email_gmail(pdf_path, to_email):

@@ -3,3 +3,4 @@ python-dotenv
 requests
 hypercorn
 reportlab
+httpx

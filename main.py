@@ -9,9 +9,6 @@ from flask import Flask, request, jsonify
 from utils.generatepdf import generate_pdf
 import httpx
 from google.cloud import tasks_v2
-from dotenv import load_dotenv
-
-load_dotenv('.env.local')
 
 PROJECT_ID = os.environ.get("GCP_PROJECT")
 QUEUE_ID = "duw-background-tasks"

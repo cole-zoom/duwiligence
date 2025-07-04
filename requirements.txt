@@ -4,3 +4,4 @@ requests
 hypercorn
 reportlab
 httpx
+google-cloud-tasks

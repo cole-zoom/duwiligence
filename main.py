@@ -8,7 +8,13 @@ from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from utils.generatepdf import generate_pdf
 import httpx
-import threading
+from google.cloud import tasks_v2
+
+PROJECT_ID = os.environ.get("GCP_PROJECT")
+QUEUE_ID = "duw-background-tasks"
+REGION = "us-east1"
+CLOUD_RUN_URL = os.environ.get("WORKER_URL")  
+SERVICE_ACCOUNT_EMAIL = os.environ.get("TASK_SERVICE_ACCOUNT")
 
 LLM_API_URL = "https://api.openai.com/v1/chat/completions"
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
@@ -20,10 +26,6 @@ GMAIL_USER = os.environ.get("GMAIL_USER")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 
 app = Flask(__name__)
-
-def process_emails_and_send_newsletter(emails):
-   
-    asyncio.run(process_emails_and_send_newsletter_async(emails))
 
 async def process_emails_and_send_newsletter_async(emails):
     print("[LOG] Background processing started (async)")
@@ -81,13 +83,44 @@ def extract():
         return jsonify({"status": "error", "message": "Invalid JSON"}), 400
     emails = data.get("emails", [])
     print(f"[LOG] Number of emails received: {len(emails)}")
+    
+    client = tasks_v2.CloudTasksClient()
+    parent = client.queue_path(PROJECT_ID, REGION, QUEUE_ID)
 
-    # For production, switch this to enqueue a Cloud Task instead of threading.Thread
-    process_emails_thread = threading.Thread(target=process_emails_and_send_newsletter, args=(emails,))
-    process_emails_thread.daemon = True
-    process_emails_thread.start()
-    print("[LOG] Background thread started, returning 200 to client")
+    payload = json.dumps(data).encode()
+    task = {
+        "http_request": {
+            "http_method": tasks_v2.HttpMethod.POST,
+            "url": CLOUD_RUN_URL, 
+            "headers": {
+                "Content-Type": "application/json"
+            },
+            "body": payload,
+            "oidc_token": {
+                "service_account_email": SERVICE_ACCOUNT_EMAIL
+            }
+        }
+    }
+
+    response = client.create_task(request={"parent": parent, "task": task})
+    print(f"[LOG] Task created: {response.name}")
+
+
     return jsonify({"status": "processing"}), 200
+
+@app.route("/worker", methods=["POST"])
+def worker():
+    try:
+        print("[LOG] /worker endpoint triggered")
+        data = request.get_json(force=True)
+        emails = data.get("emails", [])
+        print(f"[LOG] Number of emails received in worker: {len(emails)}")
+
+        asyncio.run(process_emails_and_send_newsletter_async(emails))
+        return jsonify({"status": "completed"}), 200
+    except Exception as e:
+        print(f"[ERROR] Worker failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 async def call_llm(ticker, email):
     prompt = f"""

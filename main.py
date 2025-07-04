@@ -9,6 +9,9 @@ from flask import Flask, request, jsonify
 from utils.generatepdf import generate_pdf
 import httpx
 import threading
+from dotenv import load_dotenv
+
+load_dotenv('.env.local')
 
 LLM_API_URL = "https://api.openai.com/v1/chat/completions"
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
@@ -22,7 +25,7 @@ GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 app = Flask(__name__)
 
 def process_emails_and_send_newsletter(emails):
-    # This function runs in a thread and launches the async version
+   
     asyncio.run(process_emails_and_send_newsletter_async(emails))
 
 async def process_emails_and_send_newsletter_async(emails):

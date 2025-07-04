@@ -268,10 +268,6 @@ def fetch_portfolios():
             'portfolio': 'Cash'
         },
         {
-            'symbol': 'LGN',
-            'portfolio': 'Cash'
-        },
-        {
             'symbol': 'BFM',
             'portfolio': 'Cash'
         },

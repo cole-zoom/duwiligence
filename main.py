@@ -39,7 +39,7 @@ async def process_emails_and_send_newsletter_async(emails):
     portfolios = fetch_portfolios()
     logger.info(f"[LOG] Number of portfolios fetched: {len(portfolios)}")
     stockxstories = []
-    BATCH_SIZE = 5
+    BATCH_SIZE = 12
     for stock in portfolios:
         ticker = stock['symbol']
         logger.info(f"[LOG] Processing ticker: {ticker}")
@@ -187,7 +187,7 @@ Here is the newsletter content:
 {email}
 
     """
-    max_retries = 3
+    max_retries = 1
     for i in range(max_retries):
         try:
             async with httpx.AsyncClient() as client:

@@ -22,7 +22,7 @@ GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 app = Flask(__name__)
 
 def process_emails_and_send_newsletter(emails):
-    # This function runs in a thread and launches the async version
+   
     asyncio.run(process_emails_and_send_newsletter_async(emails))
 
 async def process_emails_and_send_newsletter_async(emails):
@@ -81,8 +81,11 @@ def extract():
         return jsonify({"status": "error", "message": "Invalid JSON"}), 400
     emails = data.get("emails", [])
     print(f"[LOG] Number of emails received: {len(emails)}")
+
     # For production, switch this to enqueue a Cloud Task instead of threading.Thread
-    threading.Thread(target=process_emails_and_send_newsletter, args=(emails,)).start()
+    process_emails_thread = threading.Thread(target=process_emails_and_send_newsletter, args=(emails,))
+    process_emails_thread.daemon = True
+    process_emails_thread.start()
     print("[LOG] Background thread started, returning 200 to client")
     return jsonify({"status": "processing"}), 200
 

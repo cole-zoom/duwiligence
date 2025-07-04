@@ -9,9 +9,6 @@ from flask import Flask, request, jsonify
 from utils.generatepdf import generate_pdf
 import httpx
 import threading
-from dotenv import load_dotenv
-
-load_dotenv('.env.local')
 
 LLM_API_URL = "https://api.openai.com/v1/chat/completions"
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
@@ -84,8 +81,11 @@ def extract():
         return jsonify({"status": "error", "message": "Invalid JSON"}), 400
     emails = data.get("emails", [])
     print(f"[LOG] Number of emails received: {len(emails)}")
+
     # For production, switch this to enqueue a Cloud Task instead of threading.Thread
-    threading.Thread(target=process_emails_and_send_newsletter, args=(emails,)).start()
+    process_emails_thread = threading.Thread(target=process_emails_and_send_newsletter, args=(emails,))
+    process_emails_thread.daemon = True
+    process_emails_thread.start()
     print("[LOG] Background thread started, returning 200 to client")
     return jsonify({"status": "processing"}), 200
 

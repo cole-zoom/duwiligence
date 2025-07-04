@@ -187,7 +187,7 @@ Here is the newsletter content:
 {email}
 
     """
-    max_retries = 1
+    max_retries = 3
     for i in range(max_retries):
         try:
             async with httpx.AsyncClient() as client:
@@ -265,10 +265,6 @@ def fetch_portfolios():
         },
         {
             'symbol': 'USE',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'LGN',
             'portfolio': 'Cash'
         },
         {

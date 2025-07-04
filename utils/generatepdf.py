@@ -1,38 +1,33 @@
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.colors import black, white, HexColor
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Frame
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Frame, PageTemplate
 from reportlab.pdfgen import canvas
 
-def draw_header(c, width, height):
+def draw_header(canvas, doc):
+    width, height = LETTER
     # Draw black rectangle
-    c.setFillColor(black)
-    c.rect(0, height - 120, width, 120, fill=1, stroke=0)
+    canvas.setFillColor(black)
+    canvas.rect(0, height - 120, width, 120, fill=1, stroke=0)
 
     # Draw gold line
     gold = HexColor("#FAE100")
-    c.setFillColor(gold)
-    c.rect(0, height - 122, width, 2, fill=1, stroke=0)
+    canvas.setFillColor(gold)
+    canvas.rect(0, height - 122, width, 2, fill=1, stroke=0)
 
     # Write title "dUW Diligence"
-    c.setFont("Times-BoldItalic", 36)
-    c.setFillColor(gold)
-    c.drawString(72, height - 80, "dUW")
+    canvas.setFont("Times-BoldItalic", 36)
+    canvas.setFillColor(gold)
+    canvas.drawString(72, height - 80, "dUW")
 
-    c.setFont("Times-Roman", 36)
-    c.setFillColor(white)
-    c.drawString(150, height - 80, "Diligence")
+    canvas.setFont("Times-Roman", 36)
+    canvas.setFillColor(white)
+    canvas.drawString(150, height - 80, "Diligence")
 
 def generate_pdf(data, filename="newsletter.pdf"):
     width, height = LETTER
-    c = canvas.Canvas(filename, pagesize=LETTER)
-    draw_header(c, width, height)
-
-    # Create frame for body text
     margin = 72
     usable_height = height - 180
-    frame = Frame(margin, margin, width - 2*margin, usable_height, showBoundary=0)
-
     styles = getSampleStyleSheet()
     body_style = ParagraphStyle(
         'Story',
@@ -44,7 +39,7 @@ def generate_pdf(data, filename="newsletter.pdf"):
         textColor=black,
     )
 
-    story_flowables = [Paragraph("",body_style)]
+    story_flowables = [Paragraph("", body_style)]
     for item in data:
         ticker = item["ticker"]
         for story in item["stories"]:
@@ -57,8 +52,14 @@ def generate_pdf(data, filename="newsletter.pdf"):
             story_flowables.append(Paragraph(story_text, body_style))
             story_flowables.append(Spacer(1, 12))
 
-    frame.addFromList(story_flowables, c)
-    c.save()
+    def on_page(canvas, doc):
+        draw_header(canvas, doc)
+
+    frame = Frame(margin, margin, width - 2*margin, usable_height, showBoundary=0)
+    template = PageTemplate(id='headered', frames=frame, onPage=on_page)
+    doc = SimpleDocTemplate(filename, pagesize=LETTER, leftMargin=margin, rightMargin=margin, topMargin=margin, bottomMargin=margin)
+    doc.addPageTemplates([template])
+    doc.build(story_flowables)
 
 
 if __name__ == '__main__':

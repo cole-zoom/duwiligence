@@ -73,6 +73,7 @@ async def process_emails_and_send_newsletter_async(emails):
     try:
         logger.info(f"[LOG] Sending email with PDF attachment to coledumanski@gmail.com")
         send_email_gmail(tmp_path, "coledumanski@gmail.com")
+        send_email_gmail(tmp_path, "aidan8.kingsley@rogers.com")
         logger.info(f"[LOG] Email sent successfully")
     except Exception as e:
         logger.error(f"[ERROR] Failed to send email: {e}")

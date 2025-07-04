@@ -187,7 +187,7 @@ Here is the newsletter content:
 {email}
 
     """
-    max_retries = 10
+    max_retries = 3
     for i in range(max_retries):
         try:
             async with httpx.AsyncClient() as client:

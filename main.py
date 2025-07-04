@@ -4,6 +4,8 @@ import json
 import os
 import requests
 import smtplib
+import time
+from datetime import datetime, timezone
 from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from utils.generatepdf import generate_pdf
@@ -87,7 +89,10 @@ def extract():
     client = tasks_v2.CloudTasksClient()
     parent = client.queue_path(PROJECT_ID, REGION, QUEUE_ID)
 
-    payload = json.dumps(data).encode()
+    payload = {
+        'emails': json.dumps(data).encode(),
+        'timestamp': int(time.time() * 1000)
+    }
     task = {
         "http_request": {
             "http_method": tasks_v2.HttpMethod.POST,
@@ -112,7 +117,18 @@ def extract():
 def worker():
     try:
         print("[LOG] /worker endpoint triggered")
-        data = request.get_json(force=True)
+        payload = request.get_json(force=True)
+        data = payload['emails']
+
+        timestamp = payload['timestamp']
+        now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+        age_ms = now_ms-timestamp
+        print(f'[LOG] Age of instance is{age_ms} ms')
+        MAX_AGE_MS = 10000  # 10 seconds
+        if age_ms > MAX_AGE_MS:
+            print(f"[LOG] Dropping old task, age: {age_ms}ms")
+            return "DROPPED_OLD_TASK", 200
+
         emails = data.get("emails", [])
         print(f"[LOG] Number of emails received in worker: {len(emails)}")
 

@@ -22,7 +22,11 @@ GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 app = Flask(__name__)
 
 def process_emails_and_send_newsletter(emails):
-    print("[LOG] Background processing started")
+    # This function runs in a thread and launches the async version
+    asyncio.run(process_emails_and_send_newsletter_async(emails))
+
+async def process_emails_and_send_newsletter_async(emails):
+    print("[LOG] Background processing started (async)")
     portfolios = fetch_portfolios()
     print(f"[LOG] Number of portfolios fetched: {len(portfolios)}")
     stockxstories = []
@@ -35,13 +39,13 @@ def process_emails_and_send_newsletter(emails):
             batch = emails[i:i+BATCH_SIZE]
             print(f"[LOG] Processing batch {i//BATCH_SIZE+1} for ticker {ticker}")
             tasks = [call_llm(ticker, str(email['body'])) for email in batch]
-            results = asyncio.run(asyncio.gather(*tasks))
+            results = await asyncio.gather(*tasks)
             for idx, list_of_stories in enumerate(results):
                 print(f"[LOG] LLM returned {len(list_of_stories)} stories for ticker {ticker} on email {i+idx+1}")
                 stories += list_of_stories
             if i + BATCH_SIZE < len(emails):
                 print(f"[LOG] Waiting 3 seconds before next batch for ticker {ticker}")
-                asyncio.run(asyncio.sleep(3))
+                await asyncio.sleep(3)
         stockxstories.append({
                 'ticker': ticker,
                 'stories': stories
@@ -64,7 +68,7 @@ def process_emails_and_send_newsletter(emails):
     except Exception as e:
         print(f"[ERROR] Failed to send email: {e}")
         return
-    print(f"[LOG] Background processing completed successfully")
+    print(f"[LOG] Background processing completed successfully (async)")
 
 @app.route("/extract", methods=["POST"])
 def extract():

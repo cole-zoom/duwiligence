@@ -90,7 +90,7 @@ def extract():
     parent = client.queue_path(PROJECT_ID, REGION, QUEUE_ID)
 
     payload = {
-        'emails': json.dumps(data).encode(),
+        'emails': json.dumps(data),
         'timestamp': int(time.time() * 1000)
     }
     task = {
@@ -100,7 +100,7 @@ def extract():
             "headers": {
                 "Content-Type": "application/json"
             },
-            "body": payload,
+            "body": payload.encode(),
             "oidc_token": {
                 "service_account_email": SERVICE_ACCOUNT_EMAIL
             }

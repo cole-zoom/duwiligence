@@ -118,13 +118,23 @@ def worker():
     try:
         print("[LOG] /worker endpoint triggered")
         payload = request.get_json(force=True)
-        data = payload['emails']
+        if not payload:
+            print("[WARN] Dropped Cloud Task with no payload (likely a retry)")
+            return "Dropped empty payload", 200 
+          
+        data = payload.get('emails')
+        if not data:
+            print("[WARN] Dropped Cloud Task with no data (likely a retry)")
+            return "Dropped empty payload", 200  
 
-        timestamp = payload['timestamp']
+        timestamp = payload.get('timestamp')
+        if not timestamp:
+            print("[WARN] Dropped Cloud Task with no timestamp (likely a retry)")
+            return "Dropped empty payload", 200 
         now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
         age_ms = now_ms-timestamp
         print(f'[LOG] Age of instance is{age_ms} ms')
-        MAX_AGE_MS = 10000  # 10 seconds
+        MAX_AGE_MS = 10000  
         if age_ms > MAX_AGE_MS:
             print(f"[LOG] Dropping old task, age: {age_ms}ms")
             return "DROPPED_OLD_TASK", 200

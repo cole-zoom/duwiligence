@@ -23,7 +23,7 @@ REGION = "us-east1"
 CLOUD_RUN_URL = os.environ.get("WORKER_URL")  
 SERVICE_ACCOUNT_EMAIL = os.environ.get("TASK_SERVICE_ACCOUNT")
 
-LLM_API_KEY = os.environ.get("OPENAI_API_KEY")
+LLM_API_KEY = os.environ.get("HELICONE_API_KEY")
 GMAIL_USER = os.environ.get("GMAIL_USER")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 

@@ -10,8 +10,11 @@ from datetime import datetime, timezone
 from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from utils.generatepdf import generate_pdf
-import httpx
 from google.cloud import tasks_v2
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
 
 # Set up logger
 logging.basicConfig(level=logging.INFO)
@@ -23,23 +26,30 @@ REGION = "us-east1"
 CLOUD_RUN_URL = os.environ.get("WORKER_URL")  
 SERVICE_ACCOUNT_EMAIL = os.environ.get("TASK_SERVICE_ACCOUNT")
 
-LLM_API_URL = "https://api.openai.com/v1/chat/completions"
-LLM_API_KEY = os.environ.get("LLM_API_KEY")
-HEADERS = {
-    "Authorization": f"Bearer {LLM_API_KEY}",
-    "Content-Type": "application/json"
-}
+LLM_API_KEY = os.environ.get("OPENAI_API_KEY")
 GMAIL_USER = os.environ.get("GMAIL_USER")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 
 app = Flask(__name__)
 
 async def process_emails_and_send_newsletter_async(emails):
+    """
+    This function processes the emails and sends the newsletter.
+    """
+
     logger.info("[LOG] Background processing started (async)")
     portfolios = fetch_portfolios()
     logger.info(f"[LOG] Number of portfolios fetched: {len(portfolios)}")
+
+    # empty list to store the stories
     stockxstories = []
+    client = OpenAI(
+        api_key=LLM_API_KEY,
+        base_url="https://ai-gateway.helicone.ai/v1"
+    )
     BATCH_SIZE = 12
+
+    # Process each portfolio
     for stock in portfolios:
         ticker = stock['symbol']
         logger.info(f"[LOG] Processing ticker: {ticker}")
@@ -47,7 +57,7 @@ async def process_emails_and_send_newsletter_async(emails):
         for i in range(0, len(emails), BATCH_SIZE):
             batch = emails[i:i+BATCH_SIZE]
             logger.info(f"[LOG] Processing batch {i//BATCH_SIZE+1} for ticker {ticker}")
-            tasks = [call_llm(ticker, str(email['body'])) for email in batch]
+            tasks = [call_llm(ticker, str(email['body']), client) for email in batch]
             results = await asyncio.gather(*tasks)
             for idx, list_of_stories in enumerate(results):
                 logger.info(f"[LOG] LLM returned {len(list_of_stories)} stories for ticker {ticker} on email {i+idx+1}")
@@ -154,7 +164,7 @@ def worker():
         logger.error(f"[ERROR] Worker failed: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-async def call_llm(ticker, email):
+async def call_llm(ticker, email, client):
     prompt = f"""
 You are a financial assistant. Your job is to carefully review the following newsletter content, which contains one or more startup or tech-related stories.
 
@@ -191,17 +201,15 @@ Here is the newsletter content:
     max_retries = 1
     for i in range(max_retries):
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(LLM_API_URL, headers=HEADERS, json={
-                    "model": "gpt-4o",
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0
-                })
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0
+            )
             logger.info(response)
-            result = response.json()
-            text = result['choices'][0]['message']['content']
+            text = response.choices[0].message.content
             cleaned_text = text.replace('```json', '').replace('```', '').strip()
             if cleaned_text.startswith('[') and cleaned_text.endswith(']'):
                 return json.loads(cleaned_text)

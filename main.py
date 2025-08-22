@@ -199,7 +199,7 @@ Here is the newsletter content:
     for i in range(max_retries):
         try:
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4o/openai",
                 messages=[
                     {"role": "user", "content": prompt}
                 ],

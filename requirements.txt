@@ -3,5 +3,5 @@ python-dotenv
 requests
 hypercorn
 reportlab
-httpx
 google-cloud-tasks
+openai

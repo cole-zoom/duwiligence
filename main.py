@@ -11,10 +11,7 @@ from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from utils.generatepdf import generate_pdf
 from google.cloud import tasks_v2
-from dotenv import load_dotenv
 from openai import OpenAI
-
-load_dotenv()
 
 # Set up logger
 logging.basicConfig(level=logging.INFO)

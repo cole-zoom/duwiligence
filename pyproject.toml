@@ -7,7 +7,7 @@ name = "duwiligence"
 version = "0.1.0"
 description = "A Flask application for processing emails and generating newsletters with AI-powered content analysis"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Cole Dumanski", email = "coledumanski@gmail.com"}
@@ -35,7 +35,7 @@ dependencies = [
     "reportlab>=4.0.0",
     "httpx>=0.25.0",
     "google-cloud-tasks>=2.14.0",
-    openai,
+    "openai",
 ]
 
 [project.optional-dependencies]

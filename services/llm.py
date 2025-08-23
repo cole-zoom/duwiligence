@@ -103,7 +103,6 @@ Here is the newsletter content:
                 messages=[
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0
             )
             logger.info(response)
             text = response.choices[0].message.content

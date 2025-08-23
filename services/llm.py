@@ -69,7 +69,6 @@ CRITICAL FORMATING INFORMATION:
 You must return the newsletter in the following json format:
 
 make up a title for the newsletter based on what the stories are about.
-
 ```json
   {{
     "title": "title of the newsletter",
@@ -107,8 +106,8 @@ Here is the newsletter content:
             )
             logger.info(response)
             text = response.choices[0].message.content
-            cleaned_text = text.replace('```json', '').replace('```', '').strip()
-            if cleaned_text.startswith('[') and cleaned_text.endswith(']'):
+            cleaned_text = text.replace('```json', '').replace('```', '').replace('```json\n', '').replace('\n```').strip()
+            if cleaned_text.startswith('{') and cleaned_text.endswith('}'):
                 return json.loads(cleaned_text)
             await asyncio.sleep(i*2)
         except Exception as e:

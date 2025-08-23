@@ -46,7 +46,7 @@ async def process_emails_and_send_newsletter_async(emails):
     letter = ''
     for portfolio in portfolios:
 
-        tickers = [portfolio['symbol'] for portfolio in portfolios]
+        tickers = [ticker['symbol'] for ticker in portfolio]
         
         logger.info(f"[LOG] Processing Portfolio")
 
@@ -54,7 +54,6 @@ async def process_emails_and_send_newsletter_async(emails):
 
         logger.info(f"[LOG] Finished processing stories, total stories: {len(stories)}")
     
-    logger.info(f"[LOG] Number of non-empty stock stories: {len(non_empty_stories)}")
     tmp_path = "/tmp/newsletter.pdf"
 
     try:

@@ -95,7 +95,7 @@ Here is the newsletter content:
 {stories}
 
     """
-    max_retries = 1
+    max_retries = 5
     for i in range(max_retries):
         try:
             response = client.chat.completions.create(

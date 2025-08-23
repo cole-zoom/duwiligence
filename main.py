@@ -43,7 +43,7 @@ async def process_emails_and_send_newsletter_async(emails):
         stories += f"Article by: {email['from']}\n Story: {email['body']}\n\n"
 
     # Process each portfolio
-    letter = ''
+    letter = {}
     for portfolio in portfolios:
 
         tickers = [ticker['symbol'] for ticker in portfolio]
@@ -51,6 +51,7 @@ async def process_emails_and_send_newsletter_async(emails):
         logger.info(f"[LOG] Processing Portfolio")
 
         letter = await call_llm(tickers, stories, client)
+        print(letter)
 
         logger.info(f"[LOG] Finished processing stories, total stories: {len(stories)}")
     

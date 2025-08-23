@@ -4,14 +4,14 @@ import json
 import logging
 import os
 import requests
-import smtplib
 import time
 from datetime import datetime, timezone
-from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from utils.generatepdf import generate_pdf
 from google.cloud import tasks_v2
-from openai import OpenAI
+from services.gmail import send_email_gmail
+from services.llm import call_llm, create_openai_client
+from services.portfolio import fetch_portfolios
 
 # Set up logger
 logging.basicConfig(level=logging.INFO)
@@ -23,9 +23,7 @@ REGION = "us-east1"
 CLOUD_RUN_URL = os.environ.get("WORKER_URL")  
 SERVICE_ACCOUNT_EMAIL = os.environ.get("TASK_SERVICE_ACCOUNT")
 
-LLM_API_KEY = os.environ.get("HELICONE_API_KEY")
-GMAIL_USER = os.environ.get("GMAIL_USER")
-GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
+
 
 app = Flask(__name__)
 
@@ -38,45 +36,35 @@ async def process_emails_and_send_newsletter_async(emails):
     portfolios = fetch_portfolios()
     logger.info(f"[LOG] Number of portfolios fetched: {len(portfolios)}")
 
-    # empty list to store the stories
-    stockxstories = []
-    client = OpenAI(
-        api_key=LLM_API_KEY,
-        base_url="https://ai-gateway.helicone.ai/v1"
-    )
-    BATCH_SIZE = 12
+    client = create_openai_client()
+    stories = ''
+
+    for email in emails:
+        stories += f"Article by: {email['from']}\n Story: {email['body']}\n\n"
 
     # Process each portfolio
-    for stock in portfolios:
-        ticker = stock['symbol']
-        logger.info(f"[LOG] Processing ticker: {ticker}")
-        stories = []
-        for i in range(0, len(emails), BATCH_SIZE):
-            batch = emails[i:i+BATCH_SIZE]
-            logger.info(f"[LOG] Processing batch {i//BATCH_SIZE+1} for ticker {ticker}")
-            tasks = [call_llm(ticker, str(email['body']), client) for email in batch]
-            results = await asyncio.gather(*tasks)
-            for idx, list_of_stories in enumerate(results):
-                logger.info(f"[LOG] LLM returned {len(list_of_stories)} stories for ticker {ticker} on email {i+idx+1}")
-                stories += list_of_stories
-            if i + BATCH_SIZE < len(emails):
-                logger.info(f"[LOG] Waiting 3 seconds before next batch for ticker {ticker}")
-                await asyncio.sleep(3)
-        stockxstories.append({
-                'ticker': ticker,
-                'stories': stories
-            })
-        logger.info(f"[LOG] Finished processing ticker {ticker}, total stories: {len(stories)}")
-    non_empty_stories = [item for item in stockxstories if item.get("stories")]
+    letter = ''
+    for portfolio in portfolios:
+
+        tickers = [portfolio['symbol'] for portfolio in portfolios]
+        
+        logger.info(f"[LOG] Processing Portfolio")
+
+        letter = call_llm(tickers, stories, client)
+
+        logger.info(f"[LOG] Finished processing stories, total stories: {len(stories)}")
+    
     logger.info(f"[LOG] Number of non-empty stock stories: {len(non_empty_stories)}")
     tmp_path = "/tmp/newsletter.pdf"
+
     try:
         logger.info(f"[LOG] Generating PDF at {tmp_path}")
-        generate_pdf(non_empty_stories, tmp_path)
+        generate_pdf(letter, tmp_path)
         logger.info(f"[LOG] PDF generated successfully")
     except Exception as e:
         logger.error(f"[ERROR] Failed to generate PDF: {e}")
         return
+
     try:
         logger.info(f"[LOG] Sending email with PDF attachment to coledumanski@gmail.com")
         send_email_gmail(tmp_path, "coledumanski@gmail.com")
@@ -85,6 +73,7 @@ async def process_emails_and_send_newsletter_async(emails):
     except Exception as e:
         logger.error(f"[ERROR] Failed to send email: {e}")
         return
+
     logger.info(f"[LOG] Background processing completed successfully (async)")
 
 @app.route("/extract", methods=["POST"])
@@ -161,152 +150,8 @@ def worker():
         logger.error(f"[ERROR] Worker failed: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-async def call_llm(ticker, email, client):
-    prompt = f"""
-You are a financial assistant. Your job is to carefully review the following newsletter content, which contains one or more startup or tech-related stories.
-
-You are also given a list of stock ticker symbols (e.g. AAPL, GOOG, TSLA). Your task is to check if *any of the stories* in the newsletter relate in any way — directly or indirectly — to any of the companies represented by those ticker symbols.
-
-If a story is related, you must include it in a JSON list in the following format:
-```json
-[
-  {{
-    "title": "title of the story",
-    "body": "full text of the story",
-    "explanation": "explain clearly how and why this story is related to the stock symbol(s)",
-    "confidence": <confidence_score from 0 to 100>
-  }},
-  ...
-]
-```
-
-If there is no related stories, YOU MUST GIVE BACK AN EMPTY LIST
-```json
-[]
-```
-
-Only include stories that have a meaningful or plausible connection to the stock tickers. Ignore all others. Be conservative and avoid hallucinating connections.
-
-Here is the stock symbol to check against:
-{ticker}
-
-Here is the newsletter content:
-
-{email}
-
-    """
-    max_retries = 1
-    for i in range(max_retries):
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o/openai",
-                messages=[
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0
-            )
-            logger.info(response)
-            text = response.choices[0].message.content
-            cleaned_text = text.replace('```json', '').replace('```', '').strip()
-            if cleaned_text.startswith('[') and cleaned_text.endswith(']'):
-                return json.loads(cleaned_text)
-            await asyncio.sleep(i*2)
-        except Exception as e:
-            logger.error(f"[ERROR] LLM call failed for ticker {ticker}: {e}")
-            await asyncio.sleep(i*2)
-    return []
-    
-def send_email_gmail(pdf_path, to_email):
-    msg = EmailMessage()
-    msg['Subject'] = "Your Daily Newsletter"
-    msg['From'] = GMAIL_USER
-    msg['To'] = to_email
-    msg.set_content("Attached is your newsletter PDF.")
-
-    with open(pdf_path, 'rb') as f:
-        msg.add_attachment(f.read(), maintype='application', subtype='pdf', filename='newsletter.pdf')
-
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-        smtp.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-        smtp.send_message(msg)
 
 
-def fetch_portfolios():
-    return[
-        {
-            'symbol': 'VGT',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'VOOG',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'PLTR',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'VDE',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'NVDA',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'META',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'RY',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'CDNS',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'AISP',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'USE',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'BFM',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'VUS',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'TD',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'AMZN',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'SCHD',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'TSLA',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'GOOG',
-            'portfolio': 'Cash'
-        },
-        {
-            'symbol': 'BTC',
-            'portfolio': 'Cash'
-        }
-    
-    ]
 
 if __name__ == "__main__":
-    app.run(debug=True, port=8080)
+    app.run(debug=True, port=8082)

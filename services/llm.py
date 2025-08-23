@@ -106,7 +106,7 @@ Here is the newsletter content:
             )
             logger.info(response)
             text = response.choices[0].message.content
-            cleaned_text = text.replace('```json', '').replace('```', '').replace('```json\n', '').replace('\n```').strip()
+            cleaned_text = text.replace('```json', '').replace('```', '').replace('```json\n', '').replace('\n```','').strip()
             if cleaned_text.startswith('{') and cleaned_text.endswith('}'):
                 return json.loads(cleaned_text)
             await asyncio.sleep(i*2)

@@ -72,7 +72,7 @@ If there is no information related to any of the stocks, DO NOT INCLUDE ANYTHING
 CRITICAL FORMATING INFORMATION:
 You must return the newsletter in the following json format:
 
-make up a title for the newsletter based on what the stories are about.
+make up a title for the newsletter based on what the stories are about. LIMIT THE TITLE TO 6 WORDS MAXIMUM.
 ```json
   {{
     "title": "title of the newsletter",

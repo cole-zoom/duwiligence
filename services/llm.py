@@ -43,8 +43,8 @@ Newsletters are given to you in the format of:
 Author: <Name of orginization>
 Story: <Full text of the story>
 
-Stocks are given to you in the format of:
-[NVDA, TSLA, AAPL, GOOG, MSFT]
+The stocks you will be creating stories within the newsletter are:
+{ticker}
 
 You must create a single newsletter that only contains information related to the attached stocks.
 
@@ -85,9 +85,6 @@ If there is no related stories, YOU MUST GIVE BACK AN EMPTY BODY
 ```
 
 Be conservative and avoid hallucinating connections.
-
-Here are the stocks to check against:
-{ticker}
 
 Here is the newsletter content:
 

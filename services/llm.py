@@ -46,6 +46,8 @@ Story: <Full text of the story>
 The stocks you will be creating stories within the newsletter are:
 {ticker}
 
+Remember, if there is no information related to a stock, DO NOT INCLUDETHE STOCK TICKER IN THE NEWSLETTER.
+
 You must create a single newsletter that only contains information related to the attached stocks.
 
 Within the newsletter, each stock must have its own section of information. Try to copy the exact wording of the original story as much as possible. 
@@ -60,6 +62,8 @@ The section must be in the format of:
 If the story relates to multiple stocks, it can look like the following:
 <Stock symbol> <Stock symbol>
 <Story>
+
+If there is no information related to a stock, DO NOT INCLUDETHE STOCK TICKER IN THE NEWSLETTER.
 
 DO NOT MAKE UP ANYTHING. ONLY USE THE INFORMATION PROVIDED TO YOU.
 If there is no information related to a stock, DO NOT INCLUDE IT IN THE NEWSLETTER.

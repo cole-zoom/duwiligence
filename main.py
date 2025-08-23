@@ -49,6 +49,8 @@ async def process_emails_and_send_newsletter_async(emails):
         tickers = [ticker['symbol'] for ticker in portfolio]
         
         logger.info(f"[LOG] Processing Portfolio")
+        print(stories)
+        print(tickers)
 
         letter = await call_llm(tickers, stories, client)
         print(letter)

@@ -50,7 +50,7 @@ async def process_emails_and_send_newsletter_async(emails):
         
         logger.info(f"[LOG] Processing Portfolio")
 
-        letter = call_llm(tickers, stories, client)
+        letter = await call_llm(tickers, stories, client)
 
         logger.info(f"[LOG] Finished processing stories, total stories: {len(stories)}")
     

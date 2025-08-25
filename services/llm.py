@@ -51,16 +51,20 @@ Remember, if there is no information related to a stock, DO NOT INCLUDETHE STOCK
 You must create a single newsletter that only contains information related to the attached stocks.
 
 Within the newsletter, each stock must have its own section of information. Try to copy the exact wording of the original story as much as possible. 
-Cite the author of the original story when adding it to the newsletter (ex//. According to <Author>, <Story>). Make sure the stories flow naturally and are not forced. 
+Cite the author of the original story when adding it to the newsletter (ex//. According to <Author>, <Story>). Make sure the stories flow naturally and are not forced.
+When Citing a story, you do not need to use "According to <Author>, <Story>, this is just an example. try to use different language that means the same thing to avoid repitition of the same words.
+Try to copy the writing style of the original story for context.
+
 DO NOT ADD A DUPLICATE STORY TWICE. If a story pertains to multiple stocks create the one section/story for the stock both of the stocks.
 
+USE MARKDOWN formatting for the newsletter.
 The section must be in the format of:
 
-<Stock symbol>
+## [short title of the story containing the stock ticker] \n
 <Story>
 
 If the story relates to multiple stocks, it can look like the following:
-<Stock symbol> <Stock symbol>
+## [short title of the story containing all stock tickers] \n
 <Story>
 
 If there is no information related to a stock, DO NOT INCLUDETHE STOCK TICKER IN THE NEWSLETTER.

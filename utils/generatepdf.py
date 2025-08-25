@@ -3,6 +3,7 @@ from reportlab.lib.colors import black, white, HexColor
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Frame, PageTemplate
 from reportlab.pdfgen import canvas
+import re
 
 def draw_header(canvas, doc, newsletter_title=""):
     width, height = LETTER
@@ -38,6 +39,8 @@ def generate_pdf(data, filename="newsletter.pdf"):
     margin = 72
     usable_height = height - 240
     styles = getSampleStyleSheet()
+    
+    # Create body style
     body_style = ParagraphStyle(
         'Story',
         parent=styles['Normal'],
@@ -47,20 +50,67 @@ def generate_pdf(data, filename="newsletter.pdf"):
         spaceAfter=12,
         textColor=black,
     )
+    
+    # Create header style for markdown headers
+    header_style = ParagraphStyle(
+        'Header',
+        parent=styles['Normal'],
+        fontName='Times-Bold',
+        fontSize=16,
+        leading=20,
+        spaceAfter=16,
+        spaceBefore=16,
+        textColor=black,
+    )
 
     # Extract title and body from the new data format
     newsletter_title = data.get("title", "")
     newsletter_body = data.get("body", "")
     
-    # Create the story flowables with just the body content
+    # Create the story flowables with markdown header support
     story_flowables = []
     if newsletter_body:
-        # Split body into paragraphs for better formatting
-        paragraphs = newsletter_body.split('\n\n')
-        for paragraph in paragraphs:
-            if paragraph.strip():  # Only add non-empty paragraphs
-                story_flowables.append(Paragraph(paragraph.strip(), body_style))
+        # Split into lines and process each line/paragraph
+        lines = newsletter_body.split('\n')
+        current_paragraph = []
+        
+        for line in lines:
+            line = line.strip()
+            
+            # If we encounter a header line
+            if re.match(r'^##\s+', line):
+                # First, add any accumulated paragraph content
+                if current_paragraph:
+                    paragraph_text = ' '.join(current_paragraph).strip()
+                    if paragraph_text:
+                        story_flowables.append(Paragraph(paragraph_text, body_style))
+                        story_flowables.append(Spacer(1, 12))
+                    current_paragraph = []
+                
+                # Add the header
+                header_text = re.sub(r'^##\s+', '', line)
+                story_flowables.append(Paragraph(header_text, header_style))
+                
+            # If it's an empty line, treat it as paragraph break
+            elif not line:
+                if current_paragraph:
+                    paragraph_text = ' '.join(current_paragraph).strip()
+                    if paragraph_text:
+                        story_flowables.append(Paragraph(paragraph_text, body_style))
+                        story_flowables.append(Spacer(1, 12))
+                    current_paragraph = []
+                    
+            # Regular content line
+            else:
+                current_paragraph.append(line)
+        
+        # Add any remaining paragraph content
+        if current_paragraph:
+            paragraph_text = ' '.join(current_paragraph).strip()
+            if paragraph_text:
+                story_flowables.append(Paragraph(paragraph_text, body_style))
                 story_flowables.append(Spacer(1, 12))
+                
     else:
         # If no body content, add a placeholder
         story_flowables.append(Paragraph("No relevant stories found.", body_style))
@@ -78,6 +128,6 @@ def generate_pdf(data, filename="newsletter.pdf"):
 if __name__ == '__main__':
     data = {
     "title": "Powell Signals Rate Cut Amid AI and Tech Sector Volatility",
-    "body": "VGT VOOG\nAccording to WSJ Markets P.M., Jerome Powell's speech in Jackson Hole raised hopes for interest rate cuts and drove stocks higher on Friday. The rally reversed what had been a rough week for markets, and particularly tech stocks. According to FT Briefing, the sell-off provides a reminder of the risks of the tech sector’s dominance in public and private markets. According to Bloomberg, Fed Chair Jerome Powell was in Jackson Hole explaining why rising unemployment means a policy adjustment may be in the cards, a comment that instantly turbocharged markets.\n\nNVDA\nAccording to Bloomberg, Nvidia told its suppliers Samsung and Amkor to stop production related to its H20 AI chip after Beijing urged local firms to avoid using it. In other news, Bloomberg also reported that the market cap of Nvidia alone -- $4.3 trillion -- is larger than the GDP of the UK, France, or Italy. Looking ahead, WSJ Markets P.M. notes that Nvidia is set to post its fiscal second-quarter report on Wednesday afternoon.\n\nMETA GOOG\nAccording to Bloomberg, Meta agreed to a deal worth at least $10 billion with Google for cloud computing services, according to people familiar.\n\nMETA\nAccording to FT Briefing, Meta is set to license AI technology from start-up Midjourney as its in-house models lag rivals, a partnership that marks a shift away from internal product development.\n\nGOOG\nAccording to Bloomberg, Apple is exploring using Google Gemini AI to power a revamped Siri. Separately, according to WSJ The Future of Everything, Google’s new Pixel 10 is chock-full of useful AI tools.\n\nAMZN\nAccording to WSJ Politics & Policy, major retailers are thriving in the tariff economy. Walmart, Amazon and the owner of T.J. Maxx are scooping up market share from rivals by offering shoppers good deals and convenience. Additionally, WSJ The Future of Everything reports that cybercriminals are using AI to create high-quality fake websites, imitating well-known retailers such as Amazon.\n\nRY TD\nAccording to Bloomberg, the outlook for Canadian banks isn’t all that bad as the country’s big lenders head into reporting season. The Big Six — Royal Bank of Canada, Toronto-Dominion Bank, Bank of Nova Scotia, Bank of Montreal, Canadian Imperial Bank of Commerce and National Bank of Canada — have seen a run-up in their share prices since they last reported in the spring. The S&P/TSX banks index is now up more than 14% this year. The biggest member, RBC, hit another record on Thursday. Earnings reports are expected next week, with RBC reporting on Wednesday and Toronto-Dominion on Thursday.\n\nBTC\nAccording to FT Briefing, the EU is speeding up plans for a digital euro after a US stablecoin law. The news raises the possibility of a digital currency using a public rather than private blockchain. On a related note, an FT Briefing opinion piece titled \"Gold diggers follow the money\" notes that the danger with gold rushes is turning up too late, and previous bouts of outperformance have typically been reversed, a sentiment that could be applied to other alternative assets."
-    }
+    "body": "## WSJ Markets Effect VOOG\nAccording to WSJ Markets P.M., Jerome Powell's speech in Jackson Hole raised hopes for interest rate cuts and drove stocks higher on Friday. The rally reversed what had been a rough week for markets, and particularly tech stocks. According to FT Briefing, the sell-off provides a reminder of the risks of the tech sector’s dominance in public and private markets. According to Bloomberg, Fed Chair Jerome Powell was in Jackson Hole explaining why rising unemployment means a policy adjustment may be in the cards, a comment that instantly turbocharged markets.\n\n## NVDA soaring\nAccording to Bloomberg, Nvidia told its suppliers Samsung and Amkor to stop production related to its H20 AI chip after Beijing urged local firms to avoid using it. In other news, Bloomberg also reported that the market cap of Nvidia alone -- $4.3 trillion -- is larger than the GDP of the UK, France, or Italy. Looking ahead, WSJ Markets P.M. notes that Nvidia is set to post its fiscal second-quarter report on Wednesday afternoon.\n\nMETA GOOG\nAccording to Bloomberg, Meta agreed to a deal worth at least $10 billion with Google for cloud computing services, according to people familiar.\n\nMETA\nAccording to FT Briefing, Meta is set to license AI technology from start-up Midjourney as its in-house models lag rivals, a partnership that marks a shift away from internal product development.\n\n## GOOG not doing well\nAccording to Bloomberg, Apple is exploring using Google Gemini AI to power a revamped Siri. Separately, according to WSJ The Future of Everything, Google’s new Pixel 10 is chock-full of useful AI tools.\n\nAMZN\nAccording to WSJ Politics & Policy, major retailers are thriving in the tariff economy. Walmart, Amazon and the owner of T.J. Maxx are scooping up market share from rivals by offering shoppers good deals and convenience. Additionally, WSJ The Future of Everything reports that cybercriminals are using AI to create high-quality fake websites, imitating well-known retailers such as Amazon.\n\nRY TD\nAccording to Bloomberg, the outlook for Canadian banks isn’t all that bad as the country’s big lenders head into reporting season. The Big Six — Royal Bank of Canada, Toronto-Dominion Bank, Bank of Nova Scotia, Bank of Montreal, Canadian Imperial Bank of Commerce and National Bank of Canada — have seen a run-up in their share prices since they last reported in the spring. The S&P/TSX banks index is now up more than 14% this year. The biggest member, RBC, hit another record on Thursday. Earnings reports are expected next week, with RBC reporting on Wednesday and Toronto-Dominion on Thursday.\n\nBTC\nAccording to FT Briefing, the EU is speeding up plans for a digital euro after a US stablecoin law. The news raises the possibility of a digital currency using a public rather than private blockchain. On a related note, an FT Briefing opinion piece titled \"Gold diggers follow the money\" notes that the danger with gold rushes is turning up too late, and previous bouts of outperformance have typically been reversed, a sentiment that could be applied to other alternative assets."
+    } 
     generate_pdf(data)

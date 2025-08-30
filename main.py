@@ -1,9 +1,7 @@
 import asyncio
-import base64
 import json
 import logging
 import os
-import requests
 import time
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify
@@ -27,36 +25,39 @@ SERVICE_ACCOUNT_EMAIL = os.environ.get("TASK_SERVICE_ACCOUNT")
 
 app = Flask(__name__)
 
-async def process_emails_and_send_newsletter_async(emails):
+async def generate_and_send_single_newsletter(email, portfolio_data, stories):
     """
-    This function processes the emails and sends the newsletter.
+    Generate and send newsletter for a single user's portfolio with pre-processed stories.
+    
+    Args:
+        email (str): User's email address
+        portfolio_data (dict): Complete portfolio object with all accounts
+        stories (str): Pre-processed stories content
     """
-
-    logger.info("[LOG] Background processing started (async)")
-    portfolios = fetch_portfolios()
-    logger.info(f"[LOG] Number of portfolios fetched: {len(portfolios)}")
-
+    logger.info(f"[LOG] Processing newsletter for {email}")
+    
     client = create_openai_client()
-    stories = ''
-
-    for email in emails:
-        stories += f"Article by: {email['from']}\n Story: {email['body']}\n\n"
-
-    # Process each portfolio
-    letter = {}
-    for portfolio in portfolios:
-
-        tickers = [ticker['symbol'] for ticker in portfolio]
-        
-        logger.info(f"[LOG] Processing Portfolio")
-
-        letter = await call_llm(tickers, stories, client)
-        print(letter)
-
-        logger.info(f"[LOG] Finished processing stories, total stories: {len(stories)}")
+    
+    # Extract all tickers from all accounts in the portfolio
+    all_tickers = []
+    for account_name, tickers in portfolio_data.items():
+        all_tickers.extend(tickers)
+    
+    # Remove duplicates while preserving order
+    unique_tickers = []
+    seen = set()
+    for ticker in all_tickers:
+        if ticker not in seen:
+            unique_tickers.append(ticker)
+            seen.add(ticker)
+    
+    logger.info(f"[LOG] Processing portfolio with {len(unique_tickers)} unique tickers across {len(portfolio_data)} accounts")
+    
+    letter = await call_llm(unique_tickers, stories, client)
+    logger.info(f"[LOG] Generated newsletter content")
     
     tmp_path = "/tmp/newsletter.pdf"
-
+    
     try:
         logger.info(f"[LOG] Generating PDF at {tmp_path}")
         generate_pdf(letter, tmp_path)
@@ -64,93 +65,114 @@ async def process_emails_and_send_newsletter_async(emails):
     except Exception as e:
         logger.error(f"[ERROR] Failed to generate PDF: {e}")
         return
-
+    
     try:
-        logger.info(f"[LOG] Sending email with PDF attachment to coledumanski@gmail.com")
-        send_email_gmail(tmp_path, "coledumanski@gmail.com")
-        send_email_gmail(tmp_path, "aidan8.kingsley@rogers.com")
-        logger.info(f"[LOG] Email sent successfully")
+        logger.info(f"[LOG] Sending email with PDF attachment to {email}")
+        send_email_gmail(tmp_path, email)
+        logger.info(f"[LOG] Email sent successfully to {email}")
     except Exception as e:
-        logger.error(f"[ERROR] Failed to send email: {e}")
+        logger.error(f"[ERROR] Failed to send email to {email}: {e}")
         return
+    
+    logger.info(f"[LOG] Newsletter processing completed successfully for {email}")
 
-    logger.info(f"[LOG] Background processing completed successfully (async)")
-
-@app.route("/extract", methods=["POST"])
-def extract():
-    logger.info("[LOG] /extract endpoint called")
+@app.route("/generate-newsletters", methods=["POST"])
+def generate_newsletters_orchestrator():
+    """
+    Receives emails from Google Apps Script, prepares shared content,
+    and creates a Cloud Task for each portfolio.
+    """
+    logger.info("[LOG] Orchestrator triggered by Apps Script...")
+    
+    # 1. Receive and process the emails into a single 'stories' string
     try:
-        data = request.get_json(force=True)
-        logger.info(f"[LOG] Received request data: {json.dumps(data)[:500]}")
+        request_data = request.get_json(force=True)
+        emails = request_data.get("emails", [])
+        if not emails:
+            return jsonify({"status": "error", "message": "No emails provided"}), 400
     except Exception as e:
         logger.error(f"[ERROR] Failed to parse JSON from request: {e}")
         return jsonify({"status": "error", "message": "Invalid JSON"}), 400
-    emails = data.get("emails", [])
-    logger.info(f"[LOG] Number of emails received: {len(emails)}")
+
+    stories = ''
+    for email in emails:
+        stories += f"Article by: {email.get('from', 'Unknown')}\n Story: {email.get('body', '')}\n\n"
     
+    logger.info(f"[LOG] Aggregated {len(emails)} emails into shared stories content.")
+
+    # 2. Fetch all portfolios from your database
+    portfolios = fetch_portfolios()
+    logger.info(f"[LOG] Found {len(portfolios)} portfolios to process.")
+
+    # 3. Create one task per portfolio, including the shared stories
     client = tasks_v2.CloudTasksClient()
     parent = client.queue_path(PROJECT_ID, REGION, QUEUE_ID)
 
-    payload = {
-        'emails': data,
-        'timestamp': int(time.time() * 1000)
-    }
-    task = {
-        "http_request": {
-            "http_method": tasks_v2.HttpMethod.POST,
-            "url": CLOUD_RUN_URL, 
-            "headers": {
-                "Content-Type": "application/json"
-            },
-            "body": json.dumps(payload).encode(),
-            "oidc_token": {
-                "service_account_email": SERVICE_ACCOUNT_EMAIL
+    for user_portfolio in portfolios:
+        # Extract email and portfolio from the user_portfolio dict
+        email = list(user_portfolio.keys())[0]
+        portfolio = user_portfolio[email]
+        
+        payload = {
+            'email': email,
+            'tickers': portfolio,  # This is now the entire portfolio object with all accounts
+            'stories': stories,  # Include the same stories content in each task
+            'timestamp': int(time.time() * 1000)
+        }
+        
+        task = {
+            "http_request": {
+                "http_method": tasks_v2.HttpMethod.POST,
+                "url": CLOUD_RUN_URL,  # URL to your /worker endpoint
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps(payload).encode(),
+                "oidc_token": {"service_account_email": SERVICE_ACCOUNT_EMAIL}
             }
         }
-    }
+        response = client.create_task(request={"parent": parent, "task": task})
+        logger.info(f"[LOG] Created task {response.name} for portfolio")
 
-    response = client.create_task(request={"parent": parent, "task": task})
-    logger.info(f"[LOG] Task created: {response.name}")
-
-
-    return jsonify({"status": "processing"}), 200
+    return jsonify({"status": "tasks created", "count": len(portfolios)}), 200
 
 @app.route("/worker", methods=["POST"])
 def worker():
+    logger.info("[LOG] /worker endpoint triggered")
     try:
-        logger.info("[LOG] /worker endpoint triggered")
         payload = request.get_json(force=True)
         if not payload:
             logger.warning("[WARN] Dropped Cloud Task with no payload (likely a retry)")
-            return "Dropped empty payload", 200 
-          
-        data = payload.get('emails')
-        if not data:
-            logger.warning("[WARN] Dropped Cloud Task with no data (likely a retry)")
-            return "Dropped empty payload", 200  
+            return "Dropped empty payload", 200
 
+        # Check for timestamp and age validation
         timestamp = payload.get('timestamp')
         if not timestamp:
             logger.warning("[WARN] Dropped Cloud Task with no timestamp (likely a retry)")
             return "Dropped empty payload", 200 
         now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
-        age_ms = now_ms-timestamp
-        logger.info(f'[LOG] Age of instance is{age_ms} ms')
+        age_ms = now_ms - timestamp
+        logger.info(f'[LOG] Age of instance is {age_ms} ms')
         MAX_AGE_MS = 10000  
         if age_ms > MAX_AGE_MS:
             logger.info(f"[LOG] Dropping old task, age: {age_ms}ms")
             return "DROPPED_OLD_TASK", 200
+        
+        # Unpack the email, tickers, and stories from the payload
+        email = payload.get('email')
+        tickers_data = payload.get('tickers')
+        stories_content = payload.get('stories')
 
-        emails = data.get("emails", [])
-        logger.info(f"[LOG] Number of emails received in worker: {len(emails)}")
+        if not email or not tickers_data or not stories_content:
+            logger.warning("[WARN] Dropped task with incomplete payload.")
+            return "Incomplete payload", 200
 
-        asyncio.run(process_emails_and_send_newsletter_async(emails))
+        logger.info(f"[LOG] Processing portfolio for {email} with pre-processed stories")
+
+        # Run the async function with the unpacked data
+        asyncio.run(generate_and_send_single_newsletter(email, tickers_data, stories_content))
         return jsonify({"status": "completed"}), 200
     except Exception as e:
-        logger.error(f"[ERROR] Worker failed: {e}")
+        logger.error(f"[ERROR] Worker failed: {e}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
-
-
 
 
 if __name__ == "__main__":

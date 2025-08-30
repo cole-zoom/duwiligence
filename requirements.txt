@@ -5,3 +5,4 @@ hypercorn
 reportlab
 google-cloud-tasks
 openai
+psycopg[binary]

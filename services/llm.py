@@ -37,7 +37,7 @@ async def call_llm(ticker, stories, client):
         list: List of related stories or empty list if none found
     """
     prompt = f"""
-You are a financial analyst. Your job is to carefully review the following newsletters, and create a single newsletter ony containing information related to the attached stocks. 
+You are a financial analyst. Your job is to carefully review the following newsletters, and create a single newsletter ony containing information related to the attached stocks.
 
 Newsletters are given to you in the format of:
 Author: <Name of orginization>
